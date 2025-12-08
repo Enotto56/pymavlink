@@ -4,7 +4,8 @@ This guide explains how to prepare a Windows PC and run `examples/telemetry_moni
 
 ## 1. Install prerequisites
 1. Install **Python 3.9+** from [python.org](https://www.python.org/downloads/windows/) and check that `python`/`pip` are in `PATH` via `python --version`.
-2. Ensure your autopilot's USB-to-serial driver is installed (Windows usually installs it automatically; if not, install the vendor's driver).
+2. Install the **pyserial** driver module (required for COM-port access): `python -m pip install pyserial`.
+3. Ensure your autopilot's USB-to-serial driver is installed (Windows usually installs it automatically; if not, install the vendor's driver).
 
 ## 2. Get the code with all needed dialects
 Use the PyPI package (recommended, includes generated MAVLink dialect modules):
@@ -37,6 +38,13 @@ When a heartbeat is received, the script prints lines like:
 [12:34:56] LOITER (ARMED) | lat: 47.397742, lon: 8.545594, rel alt: 10.2 m | alt: 10.3 m, airspeed: 5.4 m/s | voltage: 15.60 V, current: 3.21 A, remaining: 78%
 ```
 Press **Ctrl+C** to stop.
+
+### Optional GUI version
+If you prefer dropdowns for the port/baud selection and a live telemetry panel (mode, position, altitude, airspeed, battery, roll/pitch), run the Tkinter GUI instead:
+```powershell
+python examples\telemetry_monitor_gui.py
+```
+Pick your COM port and baud rate from the combo boxes, click **Connect**, and click **Disconnect** to stop.
 
 ## 5. Common checks if nothing happens
 - Verify the COM port and baud rate match your autopilot settings.
