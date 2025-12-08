@@ -42,3 +42,9 @@ Press **Ctrl+C** to stop.
 - Verify the COM port and baud rate match your autopilot settings.
 - Confirm the autopilot is powered and sending MAVLink heartbeats.
 - If you see import errors about missing dialects, ensure you installed via `pip install pymavlink` or `pip install -e .` instead of just cloning the repo without installing.
+- If installation from the repository fails with errors like `No XML message definitions found` or `FileNotFoundError ... ardupilotmega.xml`, download the `message_definitions` folder from the [`mavlink/mavlink`](https://github.com/mavlink/mavlink) project. Then set the environment variable to point at it before reinstalling:
+  ```powershell
+  set MDEF=C:\Users\<you>\path\to\mavlink\message_definitions
+  python -m pip install -e .
+  ```
+  This lets the installer generate the dialect files locally and resolves the missing-definition error.
