@@ -16,6 +16,12 @@ from typing import Callable, Optional
 
 from pymavlink import mavutil
 
+
+def _now_timestamp_ms() -> str:
+    """Return a wall-clock timestamp with millisecond precision."""
+
+    return datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
 if importlib.util.find_spec("serial.tools.list_ports") is not None:
     import serial.tools.list_ports as list_ports
 else:
@@ -268,7 +274,7 @@ class TelemetryPane:
                         f"{name}:{count}" for name, count in sorted(self._recv_counts.items())
                     )
                     rate = self._recv_counts.get("total", 0) / elapsed if elapsed else 0
-                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                    now_str = _now_timestamp_ms()
                     print(
                         f"[{now_str}] [{self.title}] recv {self._recv_counts.get('total', 0)} msgs in {elapsed:.1f}s "
                         f"({rate:.1f} Hz): {details}"
@@ -528,7 +534,7 @@ class ChaseController:
                                 f"lat {pos['lat']:.6f}, lon {pos['lon']:.6f}, alt {pos['rel_alt_m']:.1f} m"
                             )
                             if self.debug_enabled():
-                                now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                                now_str = _now_timestamp_ms()
                                 print(
                                     f"[{now_str}] [Chase] {leader.title} -> {follower.title} at {pos['lat']:.6f}, "
                                     f"{pos['lon']:.6f}, {pos['rel_alt_m']:.1f} m"
@@ -590,7 +596,7 @@ class TelemetryMonitorUI:
             elapsed = now - self.ui_log_start
             if elapsed >= 1:
                 rate = self.ui_tick_counter / elapsed if elapsed else 0
-                now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                now_str = _now_timestamp_ms()
                 print(
                     f"[{now_str}] [UI] loop {rate:.1f} Hz; processed {processed_total} updates this tick; "
                     f"queue sizes {queue_sizes}"
