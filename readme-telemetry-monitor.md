@@ -44,7 +44,7 @@ If you prefer dropdowns for the port/baud selection and a live telemetry panel (
 ```powershell
 python examples\telemetry_monitor_gui.py
 ```
-The GUI contains two independent panels (Vehicle 1 / Vehicle 2) so you can connect to two autopilots simultaneously. Pick ports/baud rates for each, click **Connect** per vehicle, and click **Disconnect** to stop that side.
+The GUI contains two independent panels (Vehicle 1 / Vehicle 2) so you can connect to two autopilots simultaneously. Pick ports/baud rates for each, choose a telemetry rate (Hz) per vehicle, click **Connect** per vehicle, and click **Disconnect** to stop that side. Use **Apply rate** after connecting if you want to change the requested stream rate on the fly.
 
 ## 5. Common checks if nothing happens
 - Verify the COM port and baud rate match your autopilot settings.

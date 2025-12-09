@@ -40,6 +40,7 @@ class TelemetryPane:
         control.grid(row=0, column=0, sticky="ew")
         control.columnconfigure(1, weight=1)
         control.columnconfigure(3, weight=1)
+        control.columnconfigure(5, weight=1)
 
         ttk.Label(control, text="Port:").grid(row=0, column=0, **padding)
         self.port_var = tk.StringVar()
@@ -56,14 +57,29 @@ class TelemetryPane:
         )
         self.baud_combo.grid(row=0, column=3, sticky="ew", **padding)
 
+        ttk.Label(control, text="Rate (Hz):").grid(row=0, column=4, **padding)
+        self.rate_var = tk.StringVar(value="5")
+        self.rate_combo = ttk.Combobox(
+            control,
+            textvariable=self.rate_var,
+            values=["1", "2", "5", "10", "20"],
+            width=8,
+        )
+        self.rate_combo.grid(row=0, column=5, sticky="ew", **padding)
+
         self.connect_button = ttk.Button(
             control, text="Connect", command=self._toggle_connection
         )
-        self.connect_button.grid(row=0, column=4, **padding)
+        self.connect_button.grid(row=0, column=6, **padding)
+
+        self.rate_button = ttk.Button(
+            control, text="Apply rate", command=self._apply_rate
+        )
+        self.rate_button.grid(row=1, column=4, columnspan=3, sticky="ew", **padding)
 
         self.status_var = tk.StringVar(value="Disconnected")
         ttk.Label(control, textvariable=self.status_var).grid(
-            row=1, column=0, columnspan=5, sticky="w", **padding
+            row=1, column=0, columnspan=4, sticky="w", **padding
         )
 
         telemetry_frame = ttk.Frame(self.frame)
@@ -117,6 +133,7 @@ class TelemetryPane:
     def _connect(self) -> None:
         port = self.port_var.get().strip()
         baud_str = self.baud_var.get().strip()
+        rate_str = self.rate_var.get().strip()
         if not port:
             self.status_var.set("Select a port before connecting.")
             return
@@ -124,6 +141,11 @@ class TelemetryPane:
             baud = int(baud_str)
         except ValueError:
             self.status_var.set("Invalid baud rate.")
+            return
+        try:
+            rate_hz = int(rate_str)
+        except ValueError:
+            self.status_var.set("Invalid rate (Hz).")
             return
 
         self.status_var.set(f"Connecting to {port} at {baud}...")
@@ -134,6 +156,7 @@ class TelemetryPane:
             try:
                 self.master = mavutil.mavlink_connection(port, baud=baud)
                 self.master.wait_heartbeat(timeout=30)
+                self._request_stream_rate(rate_hz)
                 self.update_queue.put(
                     {
                         "status": f"Connected to system {self.master.target_system} component {self.master.target_component}",
@@ -157,6 +180,38 @@ class TelemetryPane:
         self.master = None
         self.connect_button.config(text="Connect", state="normal")
         self.status_var.set("Disconnected")
+
+    def _apply_rate(self) -> None:
+        rate_str = self.rate_var.get().strip()
+        try:
+            rate_hz = int(rate_str)
+        except ValueError:
+            self.status_var.set("Invalid rate (Hz).")
+            return
+
+        if self.master is None:
+            self.status_var.set("Connect first, then apply a rate.")
+            return
+
+        self._request_stream_rate(rate_hz)
+
+    def _request_stream_rate(self, rate_hz: int) -> None:
+        if self.master is None:
+            return
+        try:
+            for stream_id in (
+                mavutil.mavlink.MAV_DATA_STREAM_ALL,
+            ):
+                self.master.mav.request_data_stream_send(
+                    self.master.target_system,
+                    self.master.target_component,
+                    stream_id,
+                    rate_hz,
+                    1,
+                )
+            self.update_queue.put({"status": f"Requested telemetry at {rate_hz} Hz"})
+        except Exception as exc:  # noqa: BLE001
+            self.update_queue.put({"status": f"Failed to set rate: {exc}"})
 
     def _telemetry_loop(self) -> None:
         last_heartbeat: Optional[object] = None
@@ -230,7 +285,9 @@ class TelemetryPane:
                 self.status_var.set(status)
                 if status.startswith("Connected"):
                     self.connect_button.config(text="Disconnect", state="normal")
-                else:
+                elif status.startswith("Connection failed") or status.startswith(
+                    "Disconnected"
+                ):
                     self.connect_button.config(text="Connect", state="normal")
 
             for key in ("mode", "position", "alt", "airspeed", "battery", "attitude"):
