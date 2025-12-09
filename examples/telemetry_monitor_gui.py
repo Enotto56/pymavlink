@@ -9,9 +9,10 @@ import datetime
 import importlib.util
 import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk
-from typing import Optional
+from typing import Callable, Optional
 
 from pymavlink import mavutil
 
@@ -22,8 +23,12 @@ else:
 
 
 class TelemetryPane:
-    def __init__(self, parent: ttk.Frame, title: str) -> None:
+    def __init__(
+        self, parent: ttk.Frame, title: str, debug_enabled: Callable[[], bool]
+    ) -> None:
         self.frame = ttk.LabelFrame(parent, text=title)
+        self.title = title
+        self.debug_enabled = debug_enabled
 
         self.master: Optional[mavutil.mavfile] = None
         self.recv_thread: Optional[threading.Thread] = None
@@ -32,6 +37,9 @@ class TelemetryPane:
 
         # Cache the desired data stream rate in Hz for reconnects and retries.
         self.requested_rate_hz = 5
+
+        self._recv_counts: dict[str, int] = {}
+        self._recv_log_start = time.monotonic()
 
         self._build_layout()
         self._populate_ports()
@@ -154,6 +162,8 @@ class TelemetryPane:
         self.status_var.set(f"Connecting to {port} at {baud}...")
         self.connect_button.config(text="Disconnect", state="disabled")
         self.stop_event.clear()
+        self._recv_counts = {}
+        self._recv_log_start = time.monotonic()
 
         def _worker() -> None:
             try:
@@ -245,6 +255,23 @@ class TelemetryPane:
                 continue
 
             mtype = msg.get_type()
+            self._recv_counts[mtype] = self._recv_counts.get(mtype, 0) + 1
+            self._recv_counts["total"] = self._recv_counts.get("total", 0) + 1
+
+            if self.debug_enabled():
+                now = time.monotonic()
+                elapsed = now - self._recv_log_start
+                if elapsed >= 1:
+                    details = ", ".join(
+                        f"{name}:{count}" for name, count in sorted(self._recv_counts.items())
+                    )
+                    rate = self._recv_counts.get("total", 0) / elapsed if elapsed else 0
+                    print(
+                        f"[{self.title}] recv {self._recv_counts.get('total', 0)} msgs in {elapsed:.1f}s "
+                        f"({rate:.1f} Hz): {details}"
+                    )
+                    self._recv_counts = {}
+                    self._recv_log_start = now
             if mtype == "HEARTBEAT":
                 last_heartbeat = msg
             elif mtype == "GLOBAL_POSITION_INT":
@@ -278,12 +305,15 @@ class TelemetryPane:
                 }
             )
 
-    def process_queue(self) -> None:
+    def process_queue(self) -> int:
+        processed = 0
         while True:
             try:
                 update = self.update_queue.get_nowait()
             except queue.Empty:
                 break
+
+            processed += 1
 
             if update.get("disconnect"):
                 self._disconnect()
@@ -305,6 +335,11 @@ class TelemetryPane:
                     if "timestamp" in update:
                         text = f"[{update['timestamp']}] {text}" if key == "mode" else text
                     self.telemetry_vars[key].set(text)
+
+        return processed
+
+    def queue_size(self) -> int:
+        return self.update_queue.qsize()
 
     def _describe_mode(self, msg) -> str:
         base_mode = msg.base_mode
@@ -355,17 +390,26 @@ class TelemetryMonitorUI:
         # Run the UI update loop faster (10 Hz) so higher stream rates are visible.
         self.refresh_interval_ms = 100
 
+        self.debug_var = tk.BooleanVar(value=False)
+        self.ui_tick_counter = 0
+        self.ui_log_start = time.monotonic()
+
         container = ttk.Frame(root)
         container.grid(row=0, column=0, sticky="nsew")
         container.columnconfigure(0, weight=1)
         container.columnconfigure(1, weight=1)
 
+        debug_box = ttk.Checkbutton(
+            container, text="Debug mode", variable=self.debug_var, onvalue=True, offvalue=False
+        )
+        debug_box.grid(row=0, column=0, columnspan=2, sticky="w", padx=8, pady=(4, 0))
+
         self.panes = [
-            TelemetryPane(container, "Vehicle 1"),
-            TelemetryPane(container, "Vehicle 2"),
+            TelemetryPane(container, "Vehicle 1", self.debug_var.get),
+            TelemetryPane(container, "Vehicle 2", self.debug_var.get),
         ]
-        self.panes[0].frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-        self.panes[1].frame.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
+        self.panes[0].frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
+        self.panes[1].frame.grid(row=1, column=1, sticky="nsew", padx=8, pady=8)
 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -373,8 +417,24 @@ class TelemetryMonitorUI:
         self._process_queues()
 
     def _process_queues(self) -> None:
+        processed_total = 0
+        queue_sizes = []
         for pane in self.panes:
-            pane.process_queue()
+            processed_total += pane.process_queue()
+            queue_sizes.append(pane.queue_size())
+
+        self.ui_tick_counter += 1
+        if self.debug_var.get():
+            now = time.monotonic()
+            elapsed = now - self.ui_log_start
+            if elapsed >= 1:
+                rate = self.ui_tick_counter / elapsed if elapsed else 0
+                print(
+                    f"[UI] loop {rate:.1f} Hz; processed {processed_total} updates this tick; "
+                    f"queue sizes {queue_sizes}"
+                )
+                self.ui_tick_counter = 0
+                self.ui_log_start = now
         self.root.after(self.refresh_interval_ms, self._process_queues)
 
 

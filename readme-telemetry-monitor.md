@@ -48,6 +48,7 @@ The GUI contains two independent panels (Vehicle 1 / Vehicle 2) so you can conne
 
 - The monitor requests the standard MAVLink data streams (RAW_SENSORS, EXTENDED_STATUS, POSITION, EXTRA1/2/3) at the selected rate. Some autopilots cap or quantize these rates (e.g., 4/10/20 Hz), so you may not see a perfect linear change if the firmware enforces limits.
 - The UI refresh loop runs at ~10 Hz, which is fast enough to show the difference between 5 Hz and 10 Hz requests. If you still see no change, the autopilot is likely limiting the stream rate; adjust the autopilot’s SR parameters if supported.
+- Enable **Debug mode** (checkbox at the top of the window) to print to the console how many MAVLink packets are received per vehicle and how often the UI loop is running. This helps verify whether higher telemetry rates are actually arriving.
 
 ## 5. Common checks if nothing happens
 - Verify the COM port and baud rate match your autopilot settings.
