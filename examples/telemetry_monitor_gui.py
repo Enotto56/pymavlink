@@ -21,10 +21,9 @@ else:
     list_ports = None
 
 
-class TelemetryMonitorUI:
-    def __init__(self, root: tk.Tk) -> None:
-        self.root = root
-        self.root.title("Telemetry Monitor")
+class TelemetryPane:
+    def __init__(self, parent: ttk.Frame, title: str) -> None:
+        self.frame = ttk.LabelFrame(parent, text=title)
 
         self.master: Optional[mavutil.mavfile] = None
         self.recv_thread: Optional[threading.Thread] = None
@@ -33,25 +32,24 @@ class TelemetryMonitorUI:
 
         self._build_layout()
         self._populate_ports()
-        self._process_queue()
 
     def _build_layout(self) -> None:
-        padding = {"padx": 8, "pady": 4}
+        padding = {"padx": 6, "pady": 3}
 
-        control_frame = ttk.Frame(self.root)
-        control_frame.grid(row=0, column=0, sticky="ew")
-        control_frame.columnconfigure(1, weight=1)
-        control_frame.columnconfigure(3, weight=1)
+        control = ttk.Frame(self.frame)
+        control.grid(row=0, column=0, sticky="ew")
+        control.columnconfigure(1, weight=1)
+        control.columnconfigure(3, weight=1)
 
-        ttk.Label(control_frame, text="Port:").grid(row=0, column=0, **padding)
+        ttk.Label(control, text="Port:").grid(row=0, column=0, **padding)
         self.port_var = tk.StringVar()
-        self.port_combo = ttk.Combobox(control_frame, textvariable=self.port_var)
+        self.port_combo = ttk.Combobox(control, textvariable=self.port_var, width=12)
         self.port_combo.grid(row=0, column=1, sticky="ew", **padding)
 
-        ttk.Label(control_frame, text="Baud:").grid(row=0, column=2, **padding)
+        ttk.Label(control, text="Baud:").grid(row=0, column=2, **padding)
         self.baud_var = tk.StringVar(value="57600")
         self.baud_combo = ttk.Combobox(
-            control_frame,
+            control,
             textvariable=self.baud_var,
             values=["57600", "115200", "38400", "9600"],
             width=10,
@@ -59,19 +57,17 @@ class TelemetryMonitorUI:
         self.baud_combo.grid(row=0, column=3, sticky="ew", **padding)
 
         self.connect_button = ttk.Button(
-            control_frame,
-            text="Connect",
-            command=self._toggle_connection,
+            control, text="Connect", command=self._toggle_connection
         )
         self.connect_button.grid(row=0, column=4, **padding)
 
         self.status_var = tk.StringVar(value="Disconnected")
-        ttk.Label(control_frame, textvariable=self.status_var).grid(
+        ttk.Label(control, textvariable=self.status_var).grid(
             row=1, column=0, columnspan=5, sticky="w", **padding
         )
 
-        telemetry_frame = ttk.LabelFrame(self.root, text="Telemetry")
-        telemetry_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
+        telemetry_frame = ttk.Frame(self.frame)
+        telemetry_frame.grid(row=1, column=0, sticky="nsew", padx=6, pady=4)
         telemetry_frame.columnconfigure(1, weight=1)
 
         self.telemetry_vars = {
@@ -96,14 +92,11 @@ class TelemetryMonitorUI:
 
         for idx, (label, key) in enumerate(labels):
             ttk.Label(telemetry_frame, text=f"{label}:").grid(
-                row=idx, column=0, sticky="w", padx=8, pady=2
+                row=idx, column=0, sticky="w", padx=4, pady=2
             )
             ttk.Label(telemetry_frame, textvariable=self.telemetry_vars[key]).grid(
-                row=idx, column=1, sticky="w", padx=8, pady=2
+                row=idx, column=1, sticky="w", padx=4, pady=2
             )
-
-        self.root.rowconfigure(1, weight=1)
-        self.root.columnconfigure(0, weight=1)
 
     def _populate_ports(self) -> None:
         ports = []
@@ -221,7 +214,7 @@ class TelemetryMonitorUI:
                 }
             )
 
-    def _process_queue(self) -> None:
+    def process_queue(self) -> None:
         while True:
             try:
                 update = self.update_queue.get_nowait()
@@ -246,8 +239,6 @@ class TelemetryMonitorUI:
                     if "timestamp" in update:
                         text = f"[{update['timestamp']}] {text}" if key == "mode" else text
                     self.telemetry_vars[key].set(text)
-
-        self.root.after(200, self._process_queue)
 
     def _describe_mode(self, msg) -> str:
         base_mode = msg.base_mode
@@ -288,6 +279,34 @@ class TelemetryMonitorUI:
         roll_deg = msg.roll * 180.0 / 3.141592653589793
         pitch_deg = msg.pitch * 180.0 / 3.141592653589793
         return f"roll: {roll_deg:.1f}°, pitch: {pitch_deg:.1f}°"
+
+
+class TelemetryMonitorUI:
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        self.root.title("Telemetry Monitor")
+
+        container = ttk.Frame(root)
+        container.grid(row=0, column=0, sticky="nsew")
+        container.columnconfigure(0, weight=1)
+        container.columnconfigure(1, weight=1)
+
+        self.panes = [
+            TelemetryPane(container, "Vehicle 1"),
+            TelemetryPane(container, "Vehicle 2"),
+        ]
+        self.panes[0].frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self.panes[1].frame.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
+
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+
+        self._process_queues()
+
+    def _process_queues(self) -> None:
+        for pane in self.panes:
+            pane.process_queue()
+        self.root.after(200, self._process_queues)
 
 
 def main() -> None:

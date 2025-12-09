@@ -44,7 +44,7 @@ If you prefer dropdowns for the port/baud selection and a live telemetry panel (
 ```powershell
 python examples\telemetry_monitor_gui.py
 ```
-Pick your COM port and baud rate from the combo boxes, click **Connect**, and click **Disconnect** to stop.
+The GUI contains two independent panels (Vehicle 1 / Vehicle 2) so you can connect to two autopilots simultaneously. Pick ports/baud rates for each, click **Connect** per vehicle, and click **Disconnect** to stop that side.
 
 ## 5. Common checks if nothing happens
 - Verify the COM port and baud rate match your autopilot settings.
