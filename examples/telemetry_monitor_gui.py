@@ -30,6 +30,9 @@ class TelemetryPane:
         self.stop_event = threading.Event()
         self.update_queue: "queue.Queue[dict]" = queue.Queue()
 
+        # Cache the desired data stream rate in Hz for reconnects and retries.
+        self.requested_rate_hz = 5
+
         self._build_layout()
         self._populate_ports()
 
@@ -198,9 +201,15 @@ class TelemetryPane:
     def _request_stream_rate(self, rate_hz: int) -> None:
         if self.master is None:
             return
+        self.requested_rate_hz = rate_hz
         try:
             for stream_id in (
-                mavutil.mavlink.MAV_DATA_STREAM_ALL,
+                mavutil.mavlink.MAV_DATA_STREAM_RAW_SENSORS,
+                mavutil.mavlink.MAV_DATA_STREAM_EXTENDED_STATUS,
+                mavutil.mavlink.MAV_DATA_STREAM_POSITION,
+                mavutil.mavlink.MAV_DATA_STREAM_EXTRA1,
+                mavutil.mavlink.MAV_DATA_STREAM_EXTRA2,
+                mavutil.mavlink.MAV_DATA_STREAM_EXTRA3,
             ):
                 self.master.mav.request_data_stream_send(
                     self.master.target_system,
@@ -343,6 +352,9 @@ class TelemetryMonitorUI:
         self.root = root
         self.root.title("Telemetry Monitor")
 
+        # Run the UI update loop faster (10 Hz) so higher stream rates are visible.
+        self.refresh_interval_ms = 100
+
         container = ttk.Frame(root)
         container.grid(row=0, column=0, sticky="nsew")
         container.columnconfigure(0, weight=1)
@@ -363,7 +375,7 @@ class TelemetryMonitorUI:
     def _process_queues(self) -> None:
         for pane in self.panes:
             pane.process_queue()
-        self.root.after(200, self._process_queues)
+        self.root.after(self.refresh_interval_ms, self._process_queues)
 
 
 def main() -> None:

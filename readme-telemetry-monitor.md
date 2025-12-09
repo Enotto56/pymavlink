@@ -46,6 +46,9 @@ python examples\telemetry_monitor_gui.py
 ```
 The GUI contains two independent panels (Vehicle 1 / Vehicle 2) so you can connect to two autopilots simultaneously. Pick ports/baud rates for each, choose a telemetry rate (Hz) per vehicle, click **Connect** per vehicle, and click **Disconnect** to stop that side. Use **Apply rate** after connecting if you want to change the requested stream rate on the fly.
 
+- The monitor requests the standard MAVLink data streams (RAW_SENSORS, EXTENDED_STATUS, POSITION, EXTRA1/2/3) at the selected rate. Some autopilots cap or quantize these rates (e.g., 4/10/20 Hz), so you may not see a perfect linear change if the firmware enforces limits.
+- The UI refresh loop runs at ~10 Hz, which is fast enough to show the difference between 5 Hz and 10 Hz requests. If you still see no change, the autopilot is likely limiting the stream rate; adjust the autopilot’s SR parameters if supported.
+
 ## 5. Common checks if nothing happens
 - Verify the COM port and baud rate match your autopilot settings.
 - Confirm the autopilot is powered and sending MAVLink heartbeats.
