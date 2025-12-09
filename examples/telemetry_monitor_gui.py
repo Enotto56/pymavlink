@@ -268,8 +268,9 @@ class TelemetryPane:
                         f"{name}:{count}" for name, count in sorted(self._recv_counts.items())
                     )
                     rate = self._recv_counts.get("total", 0) / elapsed if elapsed else 0
+                    now_str = datetime.datetime.now().strftime("%H:%M:%S")
                     print(
-                        f"[{self.title}] recv {self._recv_counts.get('total', 0)} msgs in {elapsed:.1f}s "
+                        f"[{now_str}] [{self.title}] recv {self._recv_counts.get('total', 0)} msgs in {elapsed:.1f}s "
                         f"({rate:.1f} Hz): {details}"
                     )
                     self._recv_counts = {}
@@ -527,8 +528,9 @@ class ChaseController:
                                 f"lat {pos['lat']:.6f}, lon {pos['lon']:.6f}, alt {pos['rel_alt_m']:.1f} m"
                             )
                             if self.debug_enabled():
+                                now_str = datetime.datetime.now().strftime("%H:%M:%S")
                                 print(
-                                    f"[Chase] {leader.title} -> {follower.title} at {pos['lat']:.6f}, "
+                                    f"[{now_str}] [Chase] {leader.title} -> {follower.title} at {pos['lat']:.6f}, "
                                     f"{pos['lon']:.6f}, {pos['rel_alt_m']:.1f} m"
                                 )
                         except Exception as exc:  # noqa: BLE001
@@ -588,8 +590,9 @@ class TelemetryMonitorUI:
             elapsed = now - self.ui_log_start
             if elapsed >= 1:
                 rate = self.ui_tick_counter / elapsed if elapsed else 0
+                now_str = datetime.datetime.now().strftime("%H:%M:%S")
                 print(
-                    f"[UI] loop {rate:.1f} Hz; processed {processed_total} updates this tick; "
+                    f"[{now_str}] [UI] loop {rate:.1f} Hz; processed {processed_total} updates this tick; "
                     f"queue sizes {queue_sizes}"
                 )
                 self.ui_tick_counter = 0
