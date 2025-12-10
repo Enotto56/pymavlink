@@ -107,7 +107,7 @@ class TelemetryPane:
 
         self.telemetry_vars = {
             "mode": tk.StringVar(value="--"),
-            "position": tk.StringVar(value="lat: ---, lon: ---, rel alt: ---"),
+            "position": tk.StringVar(value="lat: ---, lon: ---, abs alt: ---"),
             "alt": tk.StringVar(value="alt: ---"),
             "airspeed": tk.StringVar(value="airspeed: ---"),
             "battery": tk.StringVar(
@@ -355,7 +355,7 @@ class TelemetryPane:
         with self._state_lock:
             return dict(self._latest_position) if self._latest_position else None
 
-    def send_position_target(self, lat: float, lon: float, rel_alt_m: float) -> None:
+    def send_position_target(self, lat: float, lon: float, alt_m: float) -> None:
         if self.master is None:
             raise RuntimeError("Not connected")
 
@@ -374,11 +374,11 @@ class TelemetryPane:
             0,
             self.master.target_system,
             self.master.target_component,
-            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_INT,
             type_mask,
             int(lat * 1e7),
             int(lon * 1e7),
-            rel_alt_m,
+            alt_m,
             0,
             0,
             0,
@@ -402,18 +402,18 @@ class TelemetryPane:
 
     def _format_position(self, msg) -> str:
         if msg is None:
-            return "lat: ---, lon: ---, rel alt: ---"
+            return "lat: ---, lon: ---, abs alt: ---"
         lat = msg.lat / 1e7
         lon = msg.lon / 1e7
-        alt = msg.relative_alt / 1000.0
-        return f"lat: {lat:.6f}, lon: {lon:.6f}, rel alt: {alt:.1f} m"
+        alt = msg.alt / 1000.0
+        return f"lat: {lat:.6f}, lon: {lon:.6f}, abs alt: {alt:.1f} m"
 
     def _store_position(self, msg) -> None:
         with self._state_lock:
             self._latest_position = {
                 "lat": msg.lat / 1e7,
                 "lon": msg.lon / 1e7,
-                "rel_alt_m": msg.relative_alt / 1000.0,
+                "alt_m": msg.alt / 1000.0,
                 "timestamp": time.monotonic(),
             }
 
@@ -528,16 +528,16 @@ class ChaseController:
                         status = f"{leader.title} position stale ({age:.1f}s)."
                     else:
                         try:
-                            follower.send_position_target(pos["lat"], pos["lon"], pos["rel_alt_m"])
+                            follower.send_position_target(pos["lat"], pos["lon"], pos["alt_m"])
                             status = (
                                 f"Sent chase target to {follower.title}: "
-                                f"lat {pos['lat']:.6f}, lon {pos['lon']:.6f}, alt {pos['rel_alt_m']:.1f} m"
+                                f"lat {pos['lat']:.6f}, lon {pos['lon']:.6f}, abs alt {pos['alt_m']:.1f} m"
                             )
                             if self.debug_enabled():
                                 now_str = _now_timestamp_ms()
                                 print(
                                     f"[{now_str}] [Chase] {leader.title} -> {follower.title} at {pos['lat']:.6f}, "
-                                    f"{pos['lon']:.6f}, {pos['rel_alt_m']:.1f} m"
+                                    f"{pos['lon']:.6f}, {pos['alt_m']:.1f} m"
                                 )
                         except Exception as exc:  # noqa: BLE001
                             status = f"Chase send failed: {exc}"
