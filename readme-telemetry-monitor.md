@@ -1,0 +1,63 @@
+# Telemetry monitor (Windows quickstart)
+
+This guide explains how to prepare a Windows PC and run `examples/telemetry_monitor.py`, a console script that connects to a MAVLink autopilot over a COM port and prints basic telemetry (mode, position, altitude, airspeed, battery).
+
+## 1. Install prerequisites
+1. Install **Python 3.9+** from [python.org](https://www.python.org/downloads/windows/) and check that `python`/`pip` are in `PATH` via `python --version`.
+2. Install the **pyserial** driver module (required for COM-port access): `python -m pip install pyserial`.
+3. Ensure your autopilot's USB-to-serial driver is installed (Windows usually installs it automatically; if not, install the vendor's driver).
+
+## 2. Get the code with all needed dialects
+Use the PyPI package (recommended, includes generated MAVLink dialect modules):
+```powershell
+python -m pip install --upgrade pip
+python -m pip install pymavlink
+```
+If you want to use the repository version instead, install it in editable mode (this also builds the dialect modules during installation):
+```powershell
+cd path\to\pymavlink
+python -m pip install -e .
+```
+
+## 3. Find your COM port
+1. Connect the flight controller via USB.
+2. Open **Device Manager → Ports (COM & LPT)** and note the port name (e.g., `COM3`).
+3. Use the baud rate configured on the flight controller (common values: `57600`, `115200`).
+
+## 4. Run the telemetry monitor
+From the repository root (or anywhere if `pymavlink` is installed):
+```powershell
+python examples\telemetry_monitor.py COM3 --baud 57600
+```
+Options you may need:
+- `--source-system` / `--source-component` — IDs for messages you send (defaults: 255/190).
+- `--heartbeat-timeout` — seconds to wait for the first heartbeat before giving up (default: 30).
+
+When a heartbeat is received, the script prints lines like:
+```
+[12:34:56] LOITER (ARMED) | lat: 47.397742, lon: 8.545594, rel alt: 10.2 m | alt: 10.3 m, airspeed: 5.4 m/s | voltage: 15.60 V, current: 3.21 A, remaining: 78%
+```
+Press **Ctrl+C** to stop.
+
+### Optional GUI version
+If you prefer dropdowns for the port/baud selection and a live telemetry panel (mode, position, altitude, airspeed, battery, roll/pitch), run the Tkinter GUI instead:
+```powershell
+python examples\telemetry_monitor_gui.py
+```
+The GUI contains two independent panels (Vehicle 1 / Vehicle 2) so you can connect to two autopilots simultaneously. Pick ports/baud rates for each, choose a telemetry rate (Hz) per vehicle, click **Connect** per vehicle, and click **Disconnect** to stop that side. Use **Apply rate** after connecting if you want to change the requested stream rate on the fly.
+
+- The monitor requests the standard MAVLink data streams (RAW_SENSORS, EXTENDED_STATUS, POSITION, EXTRA1/2/3) at the selected rate. Some autopilots cap or quantize these rates (e.g., 4/10/20 Hz), so you may not see a perfect linear change if the firmware enforces limits.
+- The UI refresh loop runs at ~10 Hz, which is fast enough to show the difference between 5 Hz and 10 Hz requests. If you still see no change, the autopilot is likely limiting the stream rate; adjust the autopilot’s SR parameters if supported.
+- Enable **Debug mode** (checkbox at the top of the window) to print to the console how many MAVLink packets are received per vehicle and how often the UI loop is running. This helps verify whether higher telemetry rates are actually arriving.
+- Use the **Chase mode** box below the two panels to forward the leader’s position to the follower every ~0.5 s. Select which vehicle is the leader and which is the follower, then click **Start chase**. The follower must support position setpoints (e.g., Guided/Lojack-style modes that listen to `SET_POSITION_TARGET_GLOBAL_INT`), otherwise it will ignore the commands. Status updates appear in the box; enable **Debug mode** to see the forwarded coordinates in the console. Chase uses the leader’s absolute altitude (AMSL) from `GLOBAL_POSITION_INT` to avoid barometer-offset drift.
+
+## 5. Common checks if nothing happens
+- Verify the COM port and baud rate match your autopilot settings.
+- Confirm the autopilot is powered and sending MAVLink heartbeats.
+- If you see import errors about missing dialects, ensure you installed via `pip install pymavlink` or `pip install -e .` instead of just cloning the repo without installing.
+- If installation from the repository fails with errors like `No XML message definitions found` or `FileNotFoundError ... ardupilotmega.xml`, download the `message_definitions` folder from the [`mavlink/mavlink`](https://github.com/mavlink/mavlink) project. Then set the environment variable to point at it before reinstalling:
+  ```powershell
+  set MDEF=C:\Users\<you>\path\to\mavlink\message_definitions
+  python -m pip install -e .
+  ```
+  This lets the installer generate the dialect files locally and resolves the missing-definition error.
